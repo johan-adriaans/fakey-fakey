@@ -2,23 +2,22 @@
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-int analogPin= 0;
-int raw= 0;
-int Vin= 5;
-float Vout= 0;
-float R1= 10000000;
-float R2= 0;
-float buffer= 0;
+int analogPin1 = 0;
+int raw1 = 0;
+bool playing1 = false;
+
+int analogPin2 = 1;
+int raw2 = 0;
+bool playing2 = false;
 
 void setup()
 {
   MIDI.begin(4);          // Launch MIDI and listen to channel 4
-  //Serial.begin(31250);
 }
 
 long runningAverage(float M) {
-  #define LM_SIZE 10
-  static float LM[LM_SIZE];      // LastMeasurements
+  #define LM_SIZE 25
+  static float LM[LM_SIZE];
   static byte index = 0;
   static long sum = 0;
   static byte count = 0;
@@ -36,18 +35,30 @@ long runningAverage(float M) {
 
 void loop()
 {
-  raw= analogRead(analogPin);
-  if( raw ) {
-    raw = runningAverage( raw );
-    buffer = raw * Vin;
-    Vout = (buffer)/1024.0;
-    if ( Vout > 2 ) {
+  raw1 = analogRead( analogPin1 );
+  if( raw1 ) {
+    raw1 = runningAverage( raw1 );
+    if ( raw1 > 265 && !playing1 ) {
       MIDI.sendNoteOn( 64, 127, 10 );
-      delay(500);
-      MIDI.sendNoteOff( 64, 127, 10 );
-      //Serial.print("Vout: ");
-      //Serial.println(Vout);
+      playing1 = true;
     }
-    //delay(100);
+    if ( playing1 && raw1 < 265 ) {
+      MIDI.sendNoteOff( 64, 127, 10 );
+      playing1 = false;
+    }
+  }
+
+  // Hmm.. Hij meet nu het verschil tussen de algemene + en - en daardoor triggert hij altijd beide signalen..
+  raw2 = analogRead( analogPin2 );
+  if( raw2 ) {
+    raw2 = runningAverage( raw2 );
+    if ( raw2 > 265 && !playing2 ) {
+      MIDI.sendNoteOn( 67, 127, 10 );
+      playing2 = true;
+    }
+    if ( playing2 && raw2 < 265 ) {
+      MIDI.sendNoteOff( 67, 127, 10 );
+      playing2 = false;
+    }
   }
 }
