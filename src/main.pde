@@ -1,6 +1,10 @@
 #include <MIDI.h>
+#include <MovingAverageFilter.h>
 
 MIDI_CREATE_DEFAULT_INSTANCE();
+
+MovingAverageFilter movingAverageFilter1(20);
+MovingAverageFilter movingAverageFilter2(20);
 
 int analogPin1 = 0;
 int raw1 = 0;
@@ -12,29 +16,18 @@ bool playing2 = false;
 
 void setup()
 {
-  MIDI.begin(4);          // Launch MIDI and listen to channel 4
-}
-
-long runningAverage(float M) {
-  #define LM_SIZE 25
-  static float LM[LM_SIZE];
-  static byte index = 0;
-  static long sum = 0;
-  static byte count = 0;
-
-  // keep sum updated to improve speed.
-  sum -= LM[index];
-  LM[index] = M;
-  sum += LM[index];
-  index++;
-  index = index % LM_SIZE;
-  if (count < LM_SIZE) count++;
-
-  return sum / count;
+  //MIDI.begin(4);          // Launch MIDI and listen to channel 4
+  Serial.begin(9600);
 }
 
 void loop()
 {
+  raw1 = movingAverageFilter1.process( analogRead( analogPin1 ) );
+  if( raw1 ) {
+    Serial.println(raw1);
+  }
+
+  /*
   raw1 = analogRead( analogPin1 );
   if( raw1 ) {
     raw1 = runningAverage( raw1 );
@@ -61,4 +54,5 @@ void loop()
       playing2 = false;
     }
   }
+  */
 }

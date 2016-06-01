@@ -1,3 +1,6 @@
 [submodule "hiduino"]
 	path = hiduino
 	url = https://github.com/ddiakopoulos/hiduino
+[submodule "lib/MovingAverageFilter"]
+	path = lib/MovingAverageFilter
+	url = https://github.com/sebnil/Moving-Avarage-Filter--Arduino-Library-
