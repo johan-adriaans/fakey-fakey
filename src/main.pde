@@ -24,8 +24,6 @@ RunningAverage avgFilter[6] = {
 
 int touchPinCount = 0;
 
-int touchWeight = 0;
-
 void setup()
 {
   if ( serialDebugMode ) {
