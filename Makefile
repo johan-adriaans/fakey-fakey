@@ -19,3 +19,6 @@ uploadfs:
 
 update:
 	platformio -f -c vim update
+
+monitor:
+	platformio serialports monitor -b 31250
