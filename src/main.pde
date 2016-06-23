@@ -5,8 +5,8 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 // Configuration
 #define TOUCH_THRESHOLD  400
+#define SERIAL_DEBUG_MODE
 
-bool serialDebugMode = true;
 int touchPins[6] = {0,1,2,3,4,5}; // The analog pins that are to register touch events
 int raw[6] = {1024, 1024, 1024, 1024, 1024, 1024}; // Raw analog input values
 bool playing[6] = {false,false,false,false,false,false}; // Is the MIDI note playing or not
@@ -26,11 +26,11 @@ int touchPinCount = 0;
 
 void setup()
 {
-  if ( serialDebugMode ) {
+  #ifdef SERIAL_DEBUG_MODE
     Serial.begin(31250);
-  } else {
+  #else
     MIDI.begin(4); // Launch MIDI and listen to channel 4
-  }
+  #endif
 
   touchPinCount = (int) sizeof(touchPins) / sizeof(int);
 }
@@ -38,31 +38,30 @@ void setup()
 void loop()
 {
   for ( int i = 0 ; i < touchPinCount; i++ ) {
-    //delay(100);
     avgFilter[i].addValue( analogRead( touchPins[i] ) );
     raw[i] = avgFilter[i].getAverage();
 
     if ( raw[i]  <= TOUCH_THRESHOLD && !playing[i] ) {
-      if ( serialDebugMode ) {
+      #ifdef SERIAL_DEBUG_MODE
         Serial.print( "Pin " );
         Serial.print( i );
         Serial.print( " was touched with power: " );
         Serial.print( raw[i] );
         Serial.print( "\n" );
-      } else {
+      #else
         MIDI.sendNoteOn( midiNotes[i], 127, 10 );
-      }
+      #endif
       playing[i] = true;
     }
     if ( playing[i] && raw[i] > TOUCH_THRESHOLD ) {
-      if ( serialDebugMode ) {
+      #ifdef SERIAL_DEBUG_MODE
         Serial.print( "Pin " );
         Serial.print( i );
         Serial.print( " was released" );
         Serial.print( "\n" );
-      } else {
+      #else
         MIDI.sendNoteOff( 64, 127, 10 );
-      }
+      #endif
       playing[i] = false;
     }
   }
