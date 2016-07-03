@@ -4,13 +4,13 @@
 MIDI_CREATE_DEFAULT_INSTANCE();
 
 // Configuration
-#define TOUCH_THRESHOLD  400
+#define TOUCH_THRESHOLD  480
 #define SERIAL_DEBUG_MODE
 
 int touchPins[6] = {0,1,2,3,4,5}; // The analog pins that are to register touch events
 int raw[6] = {1024, 1024, 1024, 1024, 1024, 1024}; // Raw analog input values
 bool playing[6] = {false,false,false,false,false,false}; // Is the MIDI note playing or not
-int midiNotes[6] = {64,64,64,64,64,64};
+int midiNotes[6] = {64,65,66,67,68,69};
 
 // Moving average object filters
 RunningAverage avgFilter[6] = {
@@ -60,7 +60,7 @@ void loop()
         Serial.print( " was released" );
         Serial.print( "\n" );
       #else
-        MIDI.sendNoteOff( 64, 127, 10 );
+        MIDI.sendNoteOff( midiNotes[i], 127, 10 );
       #endif
       playing[i] = false;
     }
