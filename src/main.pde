@@ -1,90 +1,102 @@
 #include <MIDI.h>
-#include "RunningAverage.h"
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-// Configuration
-#define TOUCH_THRESHOLD  600
-// TODO: Hier een max threshold voor de release inbouwen :)
-#define SERIAL_DEBUG_MODE
+#define ledPin 13 // PORTB7 is used as a led to show if note 0 is detecting touch
+#define timeTestPin 12 // PORTB6 is used as an output test pin for osc
 
-int potPins[2] = {8,9};
-int potNotes[2] = {12,13};
-int potVal[2] = {0,0};
-int prevPotVal[2] = {0,0};
-int touchPins[6] = {0,1,2,3,4,5}; // The analog pins that are to register touch events
-int raw[6] = {1024, 1024, 1024, 1024, 1024, 1024}; // Raw analog input values
-bool playing[6] = {false,false,false,false,false,false}; // Is the MIDI note playing or not
-int touchNotes[6] = {41,43,45,36,38,40};
+// Configure debouncing
+#define MAX_DETECT_COUNT 80
+#define UPPER_THRESH 40
+#define LOWER_THRESH 10
 
-// Moving average object filters
-RunningAverage avgFilter[6] = {
-  RunningAverage(20),
-  RunningAverage(20),
-  RunningAverage(20),
-  RunningAverage(20),
-  RunningAverage(20),
-  RunningAverage(20)
-};
+uint8_t potPins[4] = {9,11,13,15};
+uint8_t potNotes[4] = {12,13,14,15};
+uint16_t potVal[4] = {0,0,0,0};
+uint16_t prevPotVal[4] = {0,0,0,0};
 
-int touchPinCount = 0;
-int potPinCount = 0;
+bool playing[8] = {false,false,false,false,false,false,false,false}; // Is the MIDI note playing or not
+uint8_t touchNotes[8] = {41,43,45,36,38,40,39,37};
+
+uint8_t dRead[8] = {0,0,0,0,0,0,0,0};
+bool pinState[8] = {0,0,0,0,0,0,0,0};
+uint8_t touchPinCount = 8;
+uint8_t potPinCount = 4;
+
+uint8_t pinBuffer;
+uint8_t mask;
 
 void setup()
 {
-  #ifdef SERIAL_DEBUG_MODE
-    Serial.begin(31250);
-  #else
-    MIDI.begin(4); // Launch MIDI and listen to channel 4
-  #endif
+  // Init debug ports, 13 for led, reacts to port 0, 12 shows interrupt duration
+  DDRB |= (1 << 7);         // Set port 13 to output
+  DDRB |= (1 << 6);         // Set port 12 to output
 
-  touchPinCount = (int) sizeof(touchPins) / sizeof(int);
-  potPinCount = (int) sizeof(potPins) / sizeof(int);
+  MIDI.begin(4);            // Launch MIDI and listen to channel 4
+
+  // initialize timer1
+  noInterrupts();           // disable all interrupts
+  TCCR1A = 0;
+  TCCR1B = 0;
+
+  TCNT1 = 61536;            // preload timer = 65536-16000000/4kHz
+  TCCR1B |= (1 << CS10);    // 1 prescaler
+  TIMSK1 |= (1 << TOIE1);   // enable timer overflow interrupt
+  interrupts();             // enable all interrupts
+}
+
+ISR(TIMER1_OVF_vect)        // interrupt service routine that wraps a user defined function supplied by attachInterrupt
+{
+  PORTB |= (1 << 6);        // port 12
+  TCNT1 = 61536;            // preload timer
+  pinBuffer = PINC;
+  mask = 1;
+  for ( unsigned char i = 0; i < 8; i++ ) {
+    if ( pinBuffer & mask ) {
+      if ( dRead[i] > 0  ) {
+        dRead[i]--;
+        if ( dRead[i] < LOWER_THRESH ) {
+          pinState[i] = false;
+        }
+      }
+    } else {
+      if ( dRead[i] < MAX_DETECT_COUNT ) {
+        dRead[i]++;
+        if ( dRead[i] > UPPER_THRESH ) {
+          pinState[i] = true;
+        }
+      }
+    }
+    mask = mask << 1;
+  }
+  PORTB &= ~(1 << 6);
 }
 
 void loop()
 {
+  for ( int i = 0 ; i < touchPinCount; i++ ) {
+    if ( pinState[i] && !playing[i] ) {
+      MIDI.sendNoteOn( touchNotes[i], 127, 10 );
+      playing[i] = true;
+    }
+    if ( playing[i] && !pinState[i] ) {
+      MIDI.sendNoteOff( touchNotes[i], 127, 10 );
+      playing[i] = false;
+    }
+  }
+
   for ( int i = 0 ; i < potPinCount; i++ ) {
     potVal[i] = analogRead( potPins[i] );
     if ( abs( potVal[i] - prevPotVal[i] ) > 25 ) {
-      #ifdef SERIAL_DEBUG_MODE
-        Serial.print( "Pot value " );
-        Serial.print( i );
-        Serial.print( " is " );
-        Serial.print( potVal[i] );
-        Serial.print( "\n" );
-      #else
-        MIDI.sendControlChange( potNotes[i], potVal[i]/8, 10 );
-      #endif
+      MIDI.sendControlChange( potNotes[i], potVal[i]/8, 10 );
       prevPotVal[i] = potVal[i];
     }
   }
-  for ( int i = 0 ; i < touchPinCount; i++ ) {
-    avgFilter[i].addValue( analogRead( touchPins[i] ) );
-    raw[i] = avgFilter[i].getAverage();
 
-    if ( raw[i]  <= TOUCH_THRESHOLD && !playing[i] ) {
-      #ifdef SERIAL_DEBUG_MODE
-        Serial.print( "Pin " );
-        Serial.print( i );
-        Serial.print( " was touched with power: " );
-        Serial.print( raw[i] );
-        Serial.print( "\n" );
-      #else
-        MIDI.sendNoteOn( touchNotes[i], 127, 10 );
-      #endif
-      playing[i] = true;
-    }
-    if ( playing[i] && raw[i] > TOUCH_THRESHOLD ) {
-      #ifdef SERIAL_DEBUG_MODE
-        Serial.print( "Pin " );
-        Serial.print( i );
-        Serial.print( " was released" );
-        Serial.print( "\n" );
-      #else
-        MIDI.sendNoteOff( touchNotes[i], 127, 10 );
-      #endif
-      playing[i] = false;
-    }
+  // Onboard led test
+  if ( pinState[0] ) {
+    PORTB |= (1 << 7); // Turn on port 13
+  } else {
+    PORTB &= ~(1 << 7); // Turn off port 13
   }
 }
