@@ -110,6 +110,10 @@ void loop()
 
   for ( int i = 0 ; i < potPinCount; i++ ) {
     potVal[i] = analogRead( potPins[i] );
+
+    // Invert pot direction
+    potVal[i] = 1024 - potVal[i];
+
     if ( abs( potVal[i] - prevPotVal[i] ) > 10 ) {
       #if defined DEBUG
         Serial.print( "Pot " );
